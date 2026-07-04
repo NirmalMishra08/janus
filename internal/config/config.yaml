@@ -1,0 +1,16 @@
+server:
+  port: "8080"
+
+routes:
+  - path: /users
+    service: users
+  - path: /orders
+    service: orders
+
+services:
+  users:
+    instances:
+      - http://users:8081
+  orders:
+    instances:
+      - http://orders:8082

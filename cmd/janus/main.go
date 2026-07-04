@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"server/internal/config"
+	"server/internal/router"
 )
 
 func main() {
@@ -15,11 +16,14 @@ func main() {
 		return
 	}
 
-	r:= router.SetupRouter()
+	r := router.New(cfg)
+
+
+	r.Setup()
 
    
-	addr := fmt.Sprintf(":%s",cfg.PORT)
-	http.ListenAndServe(addr, )
+	addr := fmt.Sprintf(":%s",cfg.Server.Port)
+	http.ListenAndServe(addr, r.Handler())
 
 
 }

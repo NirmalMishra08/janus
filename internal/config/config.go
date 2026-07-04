@@ -1,26 +1,68 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/goccy/go-yaml"
 	"github.com/joho/godotenv"
 )
 
-type Config struct {
-	PORT string
-	POSTGRES_CONN string
-	REDIS_URL string
+type ServerConfig struct {
+	Port string `yaml:"port"`
 }
 
-func LoadConfig()(*Config, error){
-	err:= godotenv.Load()
+type Route struct {
+	Path    string `yaml:"path"`
+	Service string `yaml:"service"`
+}
+
+type ServiceConfig struct {
+	Instances []string `yaml:"instances"`
+}
+
+type Config struct {
+	Server ServerConfig `yaml:"server"`
+
+	// Routes & Services from config.yaml
+	Routes   []Route                  `yaml:"routes"`
+	Services map[string]ServiceConfig `yaml:"services"`
+
+	// Database & other sensitive configs from .env
+	PostgresConn string
+	RedisURL     string
+}
+
+func LoadConfig() (*Config, error) {
+	// Load .env file (ignores error if .env doesn't exist)
+	_ = godotenv.Load()
+
+	data, err := os.ReadFile("config/config.yaml")
 	if err != nil {
-		return nil , err
+		return nil, err
 	}
 
-	return &Config{
-       PORT: os.Getenv("PORT"),
-	   POSTGRES_CONN: os.Getenv("PORT"),
-	   REDIS_URL: os.Getenv("REDIS_URL"),
-	}, nil
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config.yaml: %w", err)
+	}
+
+	cfg.PostgresConn = os.Getenv("POSTGRES_CONN")
+	cfg.RedisURL = os.Getenv("REDIS_URL")
+
+	// Basic validation
+	if cfg.Server.Port == "" {
+		cfg.Server.Port = os.Getenv("PORT")
+		if cfg.Server.Port == "" {
+			cfg.Server.Port = "8080"
+		}
+	}
+	if cfg.Server.Port == "" {
+		cfg.Server.Port = os.Getenv("PORT")
+		if cfg.Server.Port == "" {
+			cfg.Server.Port = "8080"
+		}
+	}
+
+	return &cfg, err
 }
