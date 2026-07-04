@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"server/internal/config"
+	"server/internal/middleware"
 	"server/internal/proxy"
 
 	"github.com/go-chi/chi/v5"
@@ -16,7 +17,7 @@ type Router struct {
 
 func New(cfg *config.Config) *Router {
 	r := chi.NewRouter()
-	//  r.use(middleware.logging)
+	r.Use(middleware.Logging)
 
 	return &Router{
 		mux: r,

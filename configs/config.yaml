@@ -10,7 +10,7 @@ routes:
 services:
   users:
     instances:
-      - http://users:8081
+      - http://localhost:8081
   orders:
     instances:
-      - http://orders:8082
+      - http://localhost:8082

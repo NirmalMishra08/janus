@@ -37,7 +37,7 @@ func LoadConfig() (*Config, error) {
 	// Load .env file (ignores error if .env doesn't exist)
 	_ = godotenv.Load()
 
-	data, err := os.ReadFile("config/config.yaml")
+	data, err := os.ReadFile("../../configs/config.yaml")
 	if err != nil {
 		return nil, err
 	}

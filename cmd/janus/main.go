@@ -1,4 +1,4 @@
-package gateway
+package main
 
 import (
 	"fmt"
@@ -12,8 +12,7 @@ func main() {
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal("not able to use config file")
-		return
+		log.Fatal(err)
 	}
 
 	r := router.New(cfg)
@@ -24,6 +23,5 @@ func main() {
    
 	addr := fmt.Sprintf(":%s",cfg.Server.Port)
 	http.ListenAndServe(addr, r.Handler())
-
 
 }
