@@ -6,6 +6,7 @@ import (
 	"server/internal/config"
 	"server/internal/middleware"
 	"server/internal/proxy"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -20,7 +21,7 @@ func New(cfg *config.Config) *Router {
 	r.Use(middleware.Logging)
 	r.Use(middleware.CORS())
 	r.Use(middleware.Compress())
-	r.Use(middleware.RateLimitRedis(cfg.RedisURL,1000))
+	r.Use(middleware.RateLimitRedis(cfg.RedisURL, 1000)) // implement redis client
 
 	return &Router{
 		mux: r,
@@ -50,11 +51,16 @@ func (r *Router) Setup() {
 			continue
 		}
 
-		// Use the first instance for now
-		target := service.Instances[0]
+		serviceConfig := proxy.Service{
+			ServiceName: route.Service,
+			Instances:  service.Instances,
+			RetryCount: 3,
+			Timeout:    10 * time.Second,
+		}
+		target := route.Service
 
 		// create the proxy handler
-		proxyHandler, err := proxy.NewHandler(target)
+		proxyHandler, err := proxy.NewHandler(serviceConfig)
 		if err != nil {
 			log.Printf("Failed to create proxy for %s -> %s: %v", route.Path, target, err)
 			continue
@@ -62,7 +68,7 @@ func (r *Router) Setup() {
 
 		// register the routes
 		protected.Handle(route.Path, proxyHandler)
-		protected.Handle(route.Path + "/*", proxyHandler)
+		protected.Handle(route.Path+"/*", proxyHandler)
 
 		log.Printf(" Route registered: %s → %s (%s)", route.Path, target, route.Service)
 

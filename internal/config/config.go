@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/joho/godotenv"
@@ -19,6 +20,9 @@ type Route struct {
 
 type ServiceConfig struct {
 	Instances []string `yaml:"instances"`
+	HealthPath  string   `json:"health_path" yaml:"health_path"` // e.g. "/health"
+	RetryCount  int      `json:"retry_count" yaml:"retry_count"`   // default 3
+    Timeout     time.Duration      `json:"timeout" yaml:"timeout"`         // seconds
 }
 
 type Config struct {
