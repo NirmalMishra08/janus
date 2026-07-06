@@ -28,9 +28,11 @@ type Config struct {
 	Routes   []Route                  `yaml:"routes"`
 	Services map[string]ServiceConfig `yaml:"services"`
 
+
 	// Database & other sensitive configs from .env
 	PostgresConn string
 	RedisURL     string
+	JWTSECRET string
 }
 
 func LoadConfig() (*Config, error) {
@@ -49,6 +51,7 @@ func LoadConfig() (*Config, error) {
 
 	cfg.PostgresConn = os.Getenv("POSTGRES_CONN")
 	cfg.RedisURL = os.Getenv("REDIS_URL")
+	cfg.JWTSECRET = os.Getenv("JWT_SECRET")
 
 	// Basic validation
 	if cfg.Server.Port == "" {

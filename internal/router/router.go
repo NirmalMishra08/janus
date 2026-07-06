@@ -18,6 +18,9 @@ type Router struct {
 func New(cfg *config.Config) *Router {
 	r := chi.NewRouter()
 	r.Use(middleware.Logging)
+	r.Use(middleware.CORS())
+	r.Use(middleware.Compress())
+	r.Use(middleware.RateLimitRedis(cfg.RedisURL,1000))
 
 	return &Router{
 		mux: r,
@@ -32,6 +35,8 @@ func (r *Router) Setup() {
 		w.Write([]byte("OK"))
 	})
 
+	protected := chi.NewRouter()
+	protected.Use(middleware.JWTAuth(r.cfg.JWTSECRET))
 	for _, route := range r.cfg.Routes {
 
 		service, exists := r.cfg.Services[route.Service]
@@ -56,8 +61,8 @@ func (r *Router) Setup() {
 		}
 
 		// register the routes
-		r.mux.Handle(route.Path, proxyHandler)
-		r.mux.Handle(route.Path+"/*", proxyHandler)
+		protected.Handle(route.Path, proxyHandler)
+		protected.Handle(route.Path + "/*", proxyHandler)
 
 		log.Printf(" Route registered: %s → %s (%s)", route.Path, target, route.Service)
 
