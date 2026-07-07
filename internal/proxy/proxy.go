@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -10,15 +11,15 @@ import (
 
 type Service struct {
 	ServiceName string
-	Instances  []string
-	RetryCount int
-	Timeout    time.Duration
+	Instances   []string
+	RetryCount  int
+	Timeout     time.Duration
 }
 
 type Handler struct {
-	balancer *RoundRobinBalancer
-	proxy    *httputil.ReverseProxy
-	service  Service
+	balancer    *RoundRobinBalancer
+	service     Service
+	serviceName string
 }
 
 func NewHandler(service Service) (http.Handler, error) {
@@ -28,39 +29,49 @@ func NewHandler(service Service) (http.Handler, error) {
 
 	balancer := NewRoundRobinBalancer(service.Instances, service.ServiceName)
 
-	director := func(req *http.Request) {
-		targetUrl := balancer.Next()
-		if targetUrl == "" {
-			return
-		}
-		target, err := url.Parse(targetUrl)
-		if err != nil {
-			return 
-		}
-
-		req.URL.Scheme = target.Scheme
-		req.URL.Host = target.Host
-	}
-
-	proxy := &httputil.ReverseProxy{
-		Director: director,
-		Transport: &http.Transport{
-			MaxIdleConns:        100,
-			IdleConnTimeout:     90 * time.Second,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
-		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-		},
-	}
-
 	return &Handler{
-		balancer: balancer,
-		proxy:    proxy,
-		service:  service,
+		balancer:    balancer,
+		service:     service,
+		serviceName: service.ServiceName,
 	}, nil
 }
 
+// ServeHTTP with Retry + Health Check awareness
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.proxy.ServeHTTP(w, r)
+	cb := GetCricuitBreaker(h.serviceName)
+
+	// Execute request through circuit breaker
+	_, err := cb.Execute(func() (interface{}, error) {
+		var lastErr error
+
+		for attempt := 0; attempt <= h.service.RetryCount; attempt++ {
+			targetURL := h.balancer.Next()
+			if targetURL == "" {
+				return nil, errors.New("no healthy instances")
+			}
+
+			target, _ := url.Parse(targetURL)
+			proxy := httputil.NewSingleHostReverseProxy(target)
+
+			errChan := make(chan error, 1)
+			go func() {
+				proxy.ServeHTTP(w, r)
+				errChan <- nil
+			}()
+
+			select {
+			case <-errChan:
+				return nil, nil // Success
+			case <-time.After(h.service.Timeout):
+				lastErr = errors.New("timeout")
+				continue
+			}
+		}
+		return nil, lastErr
+	})
+
+	if err != nil {
+		log.Printf("Circuit Breaker blocked or failed for %s: %v", h.serviceName, err)
+		http.Error(w, "Service unavailable", http.StatusBadGateway)
+	}
 }

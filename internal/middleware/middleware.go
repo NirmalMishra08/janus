@@ -1,12 +1,13 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
+	"server/internal/logger"
 	"time"
 
-	"github.com/go-chi/cors"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"go.uber.org/zap"
 )
 
 func Logging(next http.Handler) http.Handler {
@@ -19,19 +20,22 @@ func Logging(next http.Handler) http.Handler {
 			statusCode:     http.StatusOK,
 		}
 
+		reqID := middleware.GetReqID(r.Context())
+
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+
 		// Call the next handler
 		next.ServeHTTP(rw, r)
 
-		// Calculate latency
-		latency := time.Since(start)
+		duration := time.Since(start)
 
-		// Log the request
-		log.Printf("[%s] %s %s %d %s",
-			r.Method,
-			r.URL.Path,
-			r.RemoteAddr,
-			rw.statusCode,
-			latency,
+		logger.Log.Info("HTTP Request",
+			zap.String("request_id", reqID),
+			zap.String("method", r.Method),
+			zap.String("path", r.URL.Path),
+			zap.Int("status", ww.Status()),
+			zap.Duration("duration", duration),
+			zap.String("remote_ip", r.RemoteAddr),
 		)
 	})
 }

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 )
 
 type Router struct {
@@ -16,12 +18,15 @@ type Router struct {
 	cfg *config.Config
 }
 
-func New(cfg *config.Config) *Router {
+func New(cfg *config.Config, rdb *redis.Client) *Router {
 	r := chi.NewRouter()
+	r.Use(middleware.RequestId) // Fixed name
+	r.Use(middleware.Tracing)
+	r.Use(middleware.PrometheusMetrics) // Should be early
 	r.Use(middleware.Logging)
 	r.Use(middleware.CORS())
 	r.Use(middleware.Compress())
-	r.Use(middleware.RateLimitRedis(cfg.RedisURL, 1000)) // implement redis client
+	r.Use(middleware.RateLimitRedis(rdb, 1000))
 
 	return &Router{
 		mux: r,
@@ -32,9 +37,11 @@ func New(cfg *config.Config) *Router {
 
 func (r *Router) Setup() {
 	r.mux.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/jso")
+		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("OK"))
 	})
+
+	r.mux.Handle("/metrics", promhttp.Handler())
 
 	protected := chi.NewRouter()
 	protected.Use(middleware.JWTAuth(r.cfg.JWTSECRET))
@@ -53,9 +60,9 @@ func (r *Router) Setup() {
 
 		serviceConfig := proxy.Service{
 			ServiceName: route.Service,
-			Instances:  service.Instances,
-			RetryCount: 3,
-			Timeout:    10 * time.Second,
+			Instances:   service.Instances,
+			RetryCount:  3,
+			Timeout:     10 * time.Second,
 		}
 		target := route.Service
 
