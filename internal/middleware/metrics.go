@@ -17,7 +17,7 @@ func PrometheusMetrics(next http.Handler) http.Handler{
 
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-		next.ServeHTTP(w , r)
+		next.ServeHTTP(ww , r)
 
 		duration := time.Since(start).Seconds()
 
@@ -31,5 +31,7 @@ func PrometheusMetrics(next http.Handler) http.Handler{
 			r.URL.Path,
 			strconv.Itoa(ww.Status()),
 		).Inc()
+
+		metrics.HttpActiveRequests.Dec()
 	})
 }

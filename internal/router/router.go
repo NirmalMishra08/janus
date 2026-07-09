@@ -26,7 +26,7 @@ func New(cfg *config.Config, rdb *redis.Client) *Router {
 	r.Use(middleware.Logging)
 	r.Use(middleware.CORS())
 	r.Use(middleware.Compress())
-	r.Use(middleware.RateLimitRedis(rdb, 1000))
+	r.Use(middleware.RateLimitRedis(rdb, 50))
 
 	return &Router{
 		mux: r,
@@ -44,7 +44,7 @@ func (r *Router) Setup() {
 	r.mux.Handle("/metrics", promhttp.Handler())
 
 	protected := chi.NewRouter()
-	protected.Use(middleware.JWTAuth(r.cfg.JWTSECRET))
+	// protected.Use(middleware.JWTAuth(r.cfg.JWTSECRET))
 	for _, route := range r.cfg.Routes {
 
 		service, exists := r.cfg.Services[route.Service]
@@ -80,6 +80,8 @@ func (r *Router) Setup() {
 		log.Printf(" Route registered: %s → %s (%s)", route.Path, target, route.Service)
 
 	}
+
+	r.mux.Mount("/", protected)
 }
 
 func (r *Router) Handler() http.Handler {

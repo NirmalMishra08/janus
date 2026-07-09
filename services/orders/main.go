@@ -11,7 +11,7 @@ func main() {
 	r := chi.NewRouter()
 
 	// Handle /orders
-	r.Get("/orders", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{
 			"message": "Hello from Orders Service",
