@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,12 +21,20 @@ func RateLimitRedis(rdb *redis.Client, requestsPerMinute int) func(http.Handler)
 			now := time.Now().Unix()
 
 			pipe := rdb.Pipeline()
+
+			windowStart := time.Now().Add(-time.Minute).UnixNano()
 			// Remove old entries outside the window
-			pipe.ZRemRangeByScore(ctx, key, "0", strconv.FormatInt(now-60, 10))
+			pipe.ZRemRangeByScore(
+				ctx,
+				key,
+				"0",
+				strconv.FormatInt(windowStart, 10),
+			)
+
 			// Add current request
 			pipe.ZAdd(ctx, key, redis.Z{
 				Score:  float64(now),
-				Member: now,
+				Member: strconv.FormatInt(now, 10),
 			})
 			// Count requests in last 60 seconds
 			pipe.ZCard(ctx, key)
@@ -38,6 +47,8 @@ func RateLimitRedis(rdb *redis.Client, requestsPerMinute int) func(http.Handler)
 			}
 
 			count := cmds[2].(*redis.IntCmd).Val()
+
+			log.Println(count)
 
 			if count > int64(requestsPerMinute) {
 				http.Error(w, "Too many requests", http.StatusTooManyRequests)
